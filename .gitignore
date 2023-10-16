@@ -1,0 +1,14 @@
+dataset/
+nested/
+tune_ogb.py
+att_scores/
+factors/
+analysis/
+
+*.pt
+/.idea
+/.vscode
+/doc/build
+__pycache__
+*.pyc
+.DS_Store

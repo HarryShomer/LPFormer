@@ -1,6 +1,6 @@
 # LPFormer
 
-Official Implementation of the paper "LPFormer: Towards Adaptive Pairwise Encodings for Link Prediction"
+Official Implementation of the paper "Adaptive Pairwise Encodings for Link Prediction"
 
 ![Framework](https://raw.githubusercontent.com/HarryShomer/LPFormer/master/LPFormer-Framework.png)
 

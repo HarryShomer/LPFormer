@@ -20,7 +20,7 @@ pip install -r requirements.txt
 
 ## Data
 
-The data for Cora, Citeseer, and Pubmed can be downloaded from [here](https://github.com/Juanhui28/HeaRT#download-data). The data for the OGB datasets are downloaded automatically from the `ogb` package.
+The data for Cora, Citeseer, and Pubmed can be downloaded from [here](https://github.com/Juanhui28/HeaRT#download-data). The data should correspondingly be placed in a directory called `dataset` in the root project directory. The data for the OGB datasets are downloaded automatically from the `ogb` package.
 
 ## Reproduce Results
 

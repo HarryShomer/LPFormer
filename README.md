@@ -5,7 +5,7 @@ Official Implementation of the paper "Adaptive Pairwise Encodings for Link Predi
 ![Framework](https://raw.githubusercontent.com/HarryShomer/LPFormer/master/LPFormer-Framework.png)
 
 ## Abstract
-
+ 
 Link prediction is a common task on graph-structured data that has seen applications in a variety of domains. Classically, hand-crafted heuristics were used for this task. Heuristic measures are chosen such that they correlate well with the underlying factors related to link formation. In recent years, a new class of methods has emerged that combines the advantages of message-passing neural networks (MPNN) and heuristics methods. These methods perform predictions by using the output of an MPNN in conjunction with a "pairwise encoding" that captures the relationship between nodes in the candidate link. They have been shown to achieve strong performance on numerous datasets. However, current pairwise encodings often contain a strong  inductive bias, using the same underlying factors to classify all links. This limits the ability of existing methods to learn how to properly classify a variety of different links that may form from different factors. To address this limitation, we propose a new method, LPFormer, which attempts to adaptively learn the pairwise encodings for each link. LPFormer models the link factors via an attention module that learns the pairwise encoding that exists between nodes by modeling multiple factors integral to link prediction. Extensive experiments demonstrate that LPFormer can achieve SOTA performance on numerous datasets while maintaining efficiency.
 
 
@@ -17,6 +17,10 @@ The required python packages can be installed via the  `requirements.txt` file.
 ```
 pip install -r requirements.txt 
 ```
+
+## Data
+
+The data for Cora, Citeseer, and Pubmed can be downloaded from [here](https://github.com/Juanhui28/HeaRT#download-data). The data for the OGB datasets are downloaded automatically from the `ogb` package.
 
 ## Reproduce Results
 

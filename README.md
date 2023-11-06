@@ -43,7 +43,7 @@ The commands for reproducing the results in the paper are in the `scripts/reprod
 ```
 @article{shomer2023adaptive,
       title={Adaptive Pairwise Encodings for Link Prediction}, 
-      author={Harry Shomer and Yao Ma and Haitao Ma and Juanhui Li and Bo Wu and Jiliang Tang},
+      author={Harry Shomer and Yao Ma and Haitao Mao and Juanhui Li and Bo Wu and Jiliang Tang},
       journal={arXiv preprint arXiv:2310.11009},
       year={2023}
 }

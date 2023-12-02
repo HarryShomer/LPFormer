@@ -193,9 +193,6 @@ class LinkTransformer(nn.Module):
 
     def get_pos_encodings(self, cn_info, onehop_info=None, non1hop_info=None):
         """
-        CN encoding = Learnable Emb
-        1-Hop encoding = Based on PPR score
-
         Ensure symmetric by making `enc = g(a, b) + g(b, a)`
 
         Returns:
@@ -229,7 +226,16 @@ class LinkTransformer(nn.Module):
         non1hop_b = self.ppr_encoder_non1hop(torch.stack((non1hop_info[2] , non1hop_info[1])).t())
         non1hop_pe = non1hop_a + non1hop_b
 
-        return torch.cat((cn_pe, onehop_pe, non1hop_pe), dim=0)
+
+        # cn_pe = (cn_info[1] + cn_info[2]).unsqueeze(-1)
+        # onehop_pe = (onehop_info[1] + onehop_info[2]).unsqueeze(-1)
+
+        # if non1hop_info is None:
+        #     return torch.cat((cn_pe, onehop_pe), dim=0)
+
+        # non1hop_pe = (non1hop_info[1] + non1hop_info[2]).unsqueeze(-1)   
+
+        # return torch.cat((cn_pe, onehop_pe, non1hop_pe), dim=0)
 
 
     def compute_node_mask(self, batch, test_set, adj):

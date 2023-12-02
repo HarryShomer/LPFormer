@@ -313,12 +313,11 @@ def test_by_all(
 
 
 
-def compute_all_ppr(data, edges, test_set=False, bs=4096):
+def compute_all_ppr(ppr_matrix, edges, test_set=False, bs=4096):
     """
     Symmetric score
     """
     all_ppr = []
-    ppr_matrix = data['ppr_test' if test_set else 'ppr']
 
     for e in tqdm(edges.tolist(), "Slooowly Indexing PPR Matrix"):
         x = (ppr_matrix[e[0]][e[1]] + ppr_matrix[e[1]][e[0]]) / 2

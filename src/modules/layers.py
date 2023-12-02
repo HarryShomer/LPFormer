@@ -129,6 +129,7 @@ class LinkAttention(MessagePassing):
 
         if node_dim is None:
             node_dim = in_channels * out_dim
+            # node_dim = in_channels + 1
         else:
             node_dim = node_dim * out_dim
         

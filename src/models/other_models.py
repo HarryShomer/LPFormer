@@ -20,18 +20,25 @@ class GCN(torch.nn.Module):
         dropout,
         residual=False,
         cached=False,
-        normalize=True
+        normalize=True,
+        layer_norm=True,
+        relu=True,
     ):
         super(GCN, self).__init__()
 
-        self.lns = torch.nn.ModuleList()
+        self.relu = relu
         self.convs = torch.nn.ModuleList()
 
         if num_layers == 1:
             hidden_channels = out_channels
             
         self.convs.append(GCNConv(in_channels, hidden_channels, cached=cached, normalize=normalize))
-        self.lns.append(nn.LayerNorm(hidden_channels))
+        
+        if layer_norm:
+            self.lns = torch.nn.ModuleList()
+            self.lns.append(nn.LayerNorm(hidden_channels))
+        else:
+            self.lns = None
 
         if num_layers > 1:    
             for _ in range(num_layers - 2):
@@ -39,7 +46,8 @@ class GCN(torch.nn.Module):
                 self.lns.append(nn.LayerNorm(hidden_channels))
 
             self.convs.append(GCNConv(hidden_channels, out_channels, cached=cached, normalize=normalize))
-            self.lns.append(nn.LayerNorm(hidden_channels))
+            if layer_norm:
+                self.lns.append(nn.LayerNorm(hidden_channels))
 
         self.dropout = dropout
         self.residual = residual
@@ -56,18 +64,16 @@ class GCN(torch.nn.Module):
         """
         for i, conv in enumerate(self.convs):
             xi = conv(x, adj_t)
-            xi = self.lns[i](xi)
+            xi = self.lns[i](xi) if self.lns is not None else xi
             xi = F.dropout(xi, p=self.dropout, training=self.training)
-            xi = F.relu(xi)
+            xi = F.relu(xi) if self.relu else xi
 
             if self.residual and x.shape[-1] == xi.shape[-1]:
                 x = x + xi
             else:
                 x = xi
 
-
         return x
-    
 
 
 

@@ -28,7 +28,8 @@ class NodeEncoder(nn.Module):
 
         self.gnn_encoder = GCN(init_dim, self.dim, self.dim, train_args['gnn_layers'], 
                                train_args.get('gnn_drop', 0), cached=train_args.get('gcn_cache'), 
-                               residual=train_args['residual'], normalize=True)
+                               residual=train_args['residual'], layer_norm=train_args['layer_norm'],
+                               relu=train_args['relu'])
 
 
     def forward(self, features, adj_t, test_set=False):

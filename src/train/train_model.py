@@ -77,9 +77,7 @@ def train_epoch(model, score_func, data, optimizer, args, device):
 
         num_examples = pos_out.size(0)
         total_loss += loss.item() * num_examples
-        total_examples += num_examples        
-
-        # exit()
+        total_examples += num_examples     
 
     return total_loss / total_examples
 
@@ -95,7 +93,7 @@ def train_loop(args, train_args, data, device, loggers, seed, model_save_name, v
     evaluator_mrr = Evaluator(name='ogbl-citation2') if 'MRR' in loggers else None
 
     model = LinkTransformer(train_args, data, device=device).to(device)
-    score_func = mlp_score(model.out_dim, model.out_dim, 1, args.num_layers_predictor, train_args['pred_dropout']).to(device)
+    score_func = mlp_score(model.out_dim, model.out_dim, 1, args.pred_layers, train_args['pred_dropout']).to(device)
                         
     optimizer = torch.optim.Adam(list(model.parameters()) + list(score_func.parameters()), lr=train_args['lr'], weight_decay=train_args['weight_decay'])
     scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda e: train_args['decay'] ** e)
@@ -105,17 +103,17 @@ def train_loop(args, train_args, data, device, loggers, seed, model_save_name, v
 
     for epoch in range(1, 1 + args.epochs):
         print(f">>> Epoch {epoch} - {datetime.now().strftime('%H:%M:%S')}\n" if verbose else "", flush=True, end="")
-            
+
         loss = train_epoch(model, score_func, data, optimizer, args, device)
         print(f"Epoch {epoch} Loss: {loss:.4f}\n"  if verbose else "", end="")
                     
         if epoch % args.eval_steps == 0:
             print("Evaluating model...\n" if verbose else "", flush=True, end="")
             
-            if "citation" not in args.data_name.lower():
-                results_rank = test(model, score_func, data, evaluator_hit, evaluator_mrr, args.batch_size, k_list, heart=args.heart)
+            if "citation" not in args.data_name.lower() or args.heart:
+                results_rank = test(model, score_func, data, evaluator_hit, evaluator_mrr, args.test_batch_size, k_list, heart=args.heart)
             else:
-                results_rank = test_citation2(model, score_func, data, evaluator_hit, evaluator_mrr, args.batch_size)
+                results_rank = test_citation2(model, score_func, data, evaluator_hit, evaluator_mrr, args.test_batch_size)
 
             print(f"Epoch {epoch} Results:\n-----------------\n"  if verbose else "", end="", flush=True)
             for key, result in results_rank.items():
@@ -157,7 +155,7 @@ def train_data(args, train_args, data, device, verbose=True):
         'Hits@50': Logger(args.runs),
         'Hits@100': Logger(args.runs),
     }
-    if "citation" in data['dataset'] or data['dataset'] in ['cora', 'citeseer', 'pubmed']:
+    if "citation" in data['dataset'] or data['dataset'] in ['cora', 'citeseer', 'pubmed'] or args.heart:
         loggers['MRR'] = Logger(args.runs)
 
     # Over N splits

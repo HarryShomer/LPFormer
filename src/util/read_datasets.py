@@ -54,6 +54,16 @@ def read_data_ogb(args, device):
         data_obj['test_pos'] = torch.cat([source.unsqueeze(1), target.unsqueeze(1)], dim=-1).to(device)
         data_obj['test_neg'] = split_edge['test']['target_node_neg'].to(device)
 
+    # Overwrite Val/Test pos sample for ogbl-ppa under HeaRT
+    if args.heart and "ppa" in args.data_name:
+        with open(f'{HEART_DIR}/{args.data_name}/valid_samples_index.pt', "rb") as f:
+            val_pos_ix = torch.load(f)
+        with open(f'{HEART_DIR}/{args.data_name}/test_samples_index.pt', "rb") as f:
+            test_pos_ix = torch.load(f)
+
+        data_obj['valid_pos'] = data_obj['valid_pos'][val_pos_ix, :]
+        data_obj['test_pos'] = data_obj['test_pos'][test_pos_ix, :]
+
     # Test train performance without evaluating all test samples
     idx = torch.randperm(data_obj['train_pos'].size(0))[:data_obj['valid_pos'].size(0)]
     data_obj['train_pos_val'] = data_obj['train_pos'][idx]
@@ -83,7 +93,6 @@ def read_data_ogb(args, device):
     # Don't use edge weight. Only 0/1. Not needed for masking
     data_obj['adj_mask'] = data_obj['adj_mask'].coalesce().bool().int()
 
-
     if args.use_val_in_test:
         val_edge_index = split_edge['valid']['edge'].t()
         val_edge_index = to_undirected(val_edge_index).to(device)
@@ -109,27 +118,33 @@ def read_data_ogb(args, device):
 
     ### Load PPR matrix
     ### HACK: Stored as a SparseTensor. Convert to torch.sparse
-    if args.mask != "none":
-        print("Reading PPR...", flush=True)
-        ppr_dir = os.path.join(DATA_DIR, "..", "node_subsets", "ppr", args.data_name)
-        data_obj['ppr'] = torch.load(os.path.join(ppr_dir, f"sparse_adj-015_eps-{str(args.eps).replace('.', '')}.pt")).to(device)
-        data_obj['ppr'] = data_obj['ppr'].to_torch_sparse_coo_tensor()
+    print("Reading PPR...", flush=True)
+    ppr_dir = os.path.join(DATA_DIR, "..", "node_subsets", "ppr", args.data_name)
+    data_obj['ppr'] = torch.load(os.path.join(ppr_dir, f"sparse_adj-015_eps-{str(args.eps).replace('.', '')}.pt")).to(device)
+    data_obj['ppr'] = data_obj['ppr'].to_torch_sparse_coo_tensor()
 
-        if args.use_val_in_test:
-            data_obj['ppr_test'] = torch.load(os.path.join(ppr_dir, f"sparse_adj-015_eps-{str(args.eps).replace('.', '')}_val.pt")).to(device)
-            data_obj['ppr_test'] = data_obj['ppr_test'].to_torch_sparse_coo_tensor()
-        else:
-            data_obj['ppr_test'] = data_obj['ppr']
+    if args.use_val_in_test:
+        data_obj['ppr_test'] = torch.load(os.path.join(ppr_dir, f"sparse_adj-015_eps-{str(args.eps).replace('.', '')}_val.pt")).to(device)
+        data_obj['ppr_test'] = data_obj['ppr_test'].to_torch_sparse_coo_tensor()
+    else:
+        data_obj['ppr_test'] = data_obj['ppr']
 
     # Overwrite standard negatives
     if args.heart:
-        with open(f'{args.input_dir}/{args.data_name}/heart_valid_{args.filename}', "rb") as f:
+        with open(f'{HEART_DIR}/{args.data_name}/heart_valid_samples.npy', "rb") as f:
             neg_valid_edge = np.load(f)
-            data_obj['valid_neg'] = torch.from_numpy(neg_valid_edge)
-        with open(f'{args.input_dir}/{args.data_name}/heart_test_{args.filename}', "rb") as f:
+            data_obj['valid_neg'] = torch.from_numpy(neg_valid_edge).to(device)
+        with open(f'{HEART_DIR}/{args.data_name}/heart_test_samples.npy', "rb") as f:
             neg_test_edge = np.load(f)
-            data_obj['test_neg'] = torch.from_numpy(neg_test_edge)
+            data_obj['test_neg'] = torch.from_numpy(neg_test_edge).to(device)
 
+        # For DDI, val/test takes a long time so only use a subset of val
+        if "ddi" in args.data_name:
+            num_sample = data_obj['valid_pos'].size(0) // 4
+            idx = torch.randperm(data_obj['valid_pos'].size(0))[:num_sample].to(device)
+            data_obj['valid_pos'] = data_obj['valid_pos'][idx]
+            data_obj['valid_neg'] = data_obj['valid_neg'][idx]
+            data_obj['train_pos_val'] = data_obj['train_pos_val'][idx]
 
     return data_obj
 
@@ -199,7 +214,7 @@ def read_data_planetoid(args, device):
     feature_embeddings = torch.load(os.path.join(DATA_DIR, data_name, "gnn_feature"))
     feature_embeddings = feature_embeddings['entity_embedding']
 
-    data = {}
+    data = {"dataset": args.data_name}
     data['edge_index'] = edge_index.to(device)
     data['num_nodes'] = num_nodes
 
@@ -228,7 +243,15 @@ def read_data_planetoid(args, device):
     data['ppr'] = data['ppr'].to_torch_sparse_coo_tensor().to(device)
     data['ppr_test'] = data['ppr']
 
-    data['dataset'] = args.data_name
+    # Overwrite standard negative
+    if args.heart:
+        with open(f'{HEART_DIR}/{args.data_name}/heart_valid_samples.npy', "rb") as f:
+            neg_valid_edge = np.load(f)
+            data['valid_neg'] = torch.from_numpy(neg_valid_edge)
+        with open(f'{HEART_DIR}/{args.data_name}/heart_test_samples.npy', "rb") as f:
+            neg_test_edge = np.load(f)
+            data['test_neg'] = torch.from_numpy(neg_test_edge)
+
     return data
 
 

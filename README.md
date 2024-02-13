@@ -1,6 +1,6 @@
 # LPFormer
 
-Official Implementation of the paper "Adaptive Pairwise Encodings for Link Prediction"
+Official Implementation of the paper "LPFormer: An Adaptive Graph Transformer for Link Prediction"
 
 ![Framework](https://raw.githubusercontent.com/HarryShomer/LPFormer/master/LPFormer-Framework.png)
 
@@ -34,15 +34,15 @@ bash scripts/calc_ppr_matrices.sh
 The parameter `--eps` controls the approximation accuracy. If you'd like a better (or worse) approximation of the PPR scores, please adjust `--eps` accordingly. Please note that for larger datasets, a very lower epsilon may take a very long time to run and will result in a large file saved to the disk.
 
 
-### Reproduce Paper Results
+### Reproduce the Paper Results
 
-The commands for reproducing the results in the paper are in the `scripts/reproduce_performance.sh` file. Please note that for the ogbl-citation2 datasets, over 32GB of GPU memory is required to train the model.  
+The commands for reproducing the results on the existing setting in the paper are in the `scripts/replicate_existing.sh` file. For the HeaRT setting, they are in `scripts/replicate_heart.sh`. Please note that for the ogbl-citation2 and ogbl-ddi, over 32GB of GPU memory is required to train the model.  
 
 
 ## Cite
 ```
 @article{shomer2023adaptive,
-      title={Adaptive Pairwise Encodings for Link Prediction}, 
+      title={LPFormer: An Adaptive Graph Transformer for Link Prediction}, 
       author={Harry Shomer and Yao Ma and Haitao Mao and Juanhui Li and Bo Wu and Jiliang Tang},
       journal={arXiv preprint arXiv:2310.11009},
       year={2023}

@@ -97,9 +97,6 @@ def get_metric_score(evaluator_hit, evaluator_mrr, pos_train_pred, pos_val_pred,
         result[f'Hits@{K}'] = (result_hit_train[f'Hits@{K}'], result_hit_val[f'Hits@{K}'], result_hit_test[f'Hits@{K}'])
 
     if evaluator_mrr is not None:
-        # result_mrr_train = evaluate_mrr(evaluator_mrr, pos_train_pred, neg_val_pred.repeat(pos_val_pred.size(0), 1) )
-        # result_mrr_val = evaluate_mrr(evaluator_mrr, pos_val_pred, neg_val_pred.repeat(pos_val_pred.size(0), 1) )
-        # result_mrr_test = evaluate_mrr(evaluator_mrr, pos_test_pred, neg_test_pred.repeat(pos_test_pred.size(0), 1) )
         result_mrr_train = evaluate_mrr(pos_train_pred, neg_val_pred.repeat(pos_val_pred.size(0), 1) )
         result_mrr_val = evaluate_mrr(pos_val_pred, neg_val_pred.repeat(pos_val_pred.size(0), 1) )
         result_mrr_test = evaluate_mrr(pos_test_pred, neg_test_pred.repeat(pos_test_pred.size(0), 1) )

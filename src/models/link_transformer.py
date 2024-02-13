@@ -29,14 +29,21 @@ class LinkTransformer(nn.Module):
         self.train_args = train_args
         self.data = data
         self.device = device
-        self.mask = train_args['mask'].lower()
         self.count_ra = train_args['count_ra']
 
         # PPR Thresholds
         self.thresh_cn = train_args['thresh_cn']
         self.thresh_1hop = train_args['thresh_1hop']
         self.thresh_non1hop = train_args['thresh_non1hop']
-        self.thresh_non1hop_count = train_args['thresh_non1hop']
+
+        # Allows for easier way to know if we need to ignore some set of nodes
+        # Also allows us to be more efficient
+        if self.thresh_non1hop == 1 and self.thresh_1hop == 1:
+            self.mask = "cn"
+        elif self.thresh_non1hop == 1 and self.thresh_1hop < 1:
+            self.mask = "1-hop"
+        else:
+            self.mask = "all"
 
         # Based on PPR scores
         self.filter_cn = train_args['filter_cn']
@@ -111,7 +118,6 @@ class LinkTransformer(nn.Module):
         elementwise_edge_feats = self.elementwise_lin(x_i * x_j)
 
         pairwise_feats, att_weights = self.calc_pairwise(batch, X_node, test_set, adj_mask=adj_mask, return_weights=return_weights)
-
         combined_feats = torch.cat((elementwise_edge_feats, pairwise_feats), dim=-1)
 
         return combined_feats if not return_weights else (combined_feats, att_weights)
@@ -167,6 +173,8 @@ class LinkTransformer(nn.Module):
 
         else:
             cn_info, onehop_info, non1hop_info = self.compute_node_mask(batch, test_set, adj_mask)
+
+            # print(non1hop_info[0].shape)
 
             if non1hop_info is not None:
                 all_mask = torch.cat((cn_info[0], onehop_info[0], non1hop_info[0]), dim=-1)
@@ -226,16 +234,7 @@ class LinkTransformer(nn.Module):
         non1hop_b = self.ppr_encoder_non1hop(torch.stack((non1hop_info[2] , non1hop_info[1])).t())
         non1hop_pe = non1hop_a + non1hop_b
 
-
-        # cn_pe = (cn_info[1] + cn_info[2]).unsqueeze(-1)
-        # onehop_pe = (onehop_info[1] + onehop_info[2]).unsqueeze(-1)
-
-        # if non1hop_info is None:
-        #     return torch.cat((cn_pe, onehop_pe), dim=0)
-
-        # non1hop_pe = (non1hop_info[1] + non1hop_info[2]).unsqueeze(-1)   
-
-        # return torch.cat((cn_pe, onehop_pe, non1hop_pe), dim=0)
+        return torch.cat((cn_pe, onehop_pe, non1hop_pe), dim=0)
 
 
     def compute_node_mask(self, batch, test_set, adj):

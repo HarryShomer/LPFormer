@@ -30,17 +30,18 @@ def save_test_att(cmd_args):
         "gnn_layers": cmd_args.gnn_layers,
         "trans_layers": cmd_args.tlayers,
         "residual": cmd_args.residual,
+        "layer_norm": not cmd_args.no_layer_norm,
     }  
 
-    fields = [ 'mask', 'thresh_1hop', "mask_input", "count_ra",  
-              "filter_1hop", "filter_cn", "thresh_cn", "thresh_non1hop", 
-              "ablate_att", "ablate_pe", "ablate_feats", "ablate_ppr", "ablate_counts",
+    fields = ['thresh_1hop', "mask_input", "count_ra", "filter_1hop", 
+              "filter_cn", "thresh_cn", "thresh_non1hop", "ablate_att", 
+              "ablate_pe", "ablate_feats", "ablate_ppr", "ablate_counts",
               ]
     for f in fields:
         args[f] = getattr(cmd_args, f)
 
     model = LinkTransformer(args, data, device=device)
-    score_func = mlp_score(model.out_dim, model.out_dim, 1, cmd_args.num_layers_predictor)
+    score_func = mlp_score(model.out_dim, model.out_dim, 1, cmd_args.pred_layers)
 
     cn_nodes, onehop_nodes, non1hop_nodes = [], [], []
 
@@ -83,9 +84,11 @@ def eval_model(cmd_args):
         "gnn_layers": cmd_args.gnn_layers,
         "trans_layers": cmd_args.tlayers,
         "residual": cmd_args.residual,
+        "layer_norm": not cmd_args.no_layer_norm,
+        "relu": not cmd_args.no_relu
     }  
 
-    fields = [ 'mask', 'thresh_1hop', "mask_input", "count_ra",  
+    fields = ['thresh_1hop', "mask_input", "count_ra",  
               "filter_1hop", "filter_cn", "thresh_cn", "thresh_non1hop", 
               "ablate_att", "ablate_pe", "ablate_feats", "ablate_ppr", 
               "ablate_counts", "ablate_ppr_type"
@@ -94,14 +97,16 @@ def eval_model(cmd_args):
         args[f] = getattr(cmd_args, f)
 
     model = LinkTransformer(args, data, device=device)
-    score_func = mlp_score(model.out_dim, model.out_dim, 1, cmd_args.num_layers_predictor)
+    score_func = mlp_score(model.out_dim, model.out_dim, 1, cmd_args.pred_layers)
 
     evaluator_hit = Evaluator(name='ogbl-collab')
     evaluator_mrr = None
-    if "citation" in data['dataset'] or data['dataset'] in ['cora', 'citeseer', 'pubmed']:
+    if "citation" in data['dataset'] or data['dataset'] in ['cora', 'citeseer', 'pubmed'] or cmd_args.heart:
         evaluator_mrr = Evaluator(name='ogbl-citation2')
 
-    if cmd_args.data_name =='ogbl-collab':
+    if cmd_args.heart:
+        cmd_args.metric = 'MRR'
+    elif cmd_args.data_name =='ogbl-collab':
         cmd_args.metric = 'Hits@50'
     elif cmd_args.data_name =='ogbl-ddi':
         cmd_args.metric = 'Hits@20'
@@ -191,6 +196,10 @@ def run_model(cmd_args):
         cmd_args.metric = 'MRR'
         gcn_cache = False
 
+    # Overwrite
+    if cmd_args.heart:
+        cmd_args.metric = 'MRR'
+
     args = {
         'gcn_cache': gcn_cache,
         'gnn_layers': cmd_args.gnn_layers,
@@ -205,11 +214,13 @@ def run_model(cmd_args):
         'pred_dropout': cmd_args.pred_drop,
         'att_drop': cmd_args.att_drop,
         "feat_drop": cmd_args.feat_drop,
-        "residual": cmd_args.residual
+        "residual": cmd_args.residual,
+        "layer_norm": not cmd_args.no_layer_norm,
+        "relu": not cmd_args.no_relu
     }
 
     # Important shit from argparse
-    fields = [ 'mask', 'thresh_1hop', "mask_input", "count_ra",  
+    fields = ['thresh_1hop', "mask_input", "count_ra",  
               "filter_1hop", "filter_cn", "thresh_cn", "thresh_non1hop", 
               "ablate_att", "ablate_pe", "ablate_feats", "ablate_ppr", 
               "ablate_counts", "ablate_ppr_type"
@@ -234,20 +245,22 @@ def main():
     parser.add_argument('--tlayers', type=int, default=1)
     parser.add_argument('--num-heads', type=int, default=1)
     parser.add_argument('--gnn-layers', type=int, default=2)
-    parser.add_argument('--num_layers_predictor', type=int, default=2)
+    parser.add_argument('--pred-layers', type=int, default=2)
     parser.add_argument('--dropout', type=float, default=0.2)
     parser.add_argument('--gnn-drop', type=float, default=0.2)
     parser.add_argument('--att-drop', type=float, default=0.1)
     parser.add_argument('--pred-drop', type=float, default=0)
     parser.add_argument('--feat-drop', type=float, default=0)
     parser.add_argument("--residual", action='store_true', default=False)
-    parser.add_argument("--mask", help="'cn', '1-hop', 'ppr'", type=str, default="cn")
+    parser.add_argument("--no-layer-norm", action='store_true', default=False)
+    parser.add_argument("--no-relu", action='store_true', default=False)
 
     # Train Settings
     parser.add_argument('--epochs', type=int, default=150)
     parser.add_argument('--lr', type=float, default=1e-3)
     parser.add_argument('--decay', type=float, default=1)
     parser.add_argument('--batch-size', type=int, default=1024)
+    parser.add_argument('--test-batch-size', type=int, default=32768)
     parser.add_argument('--num-negative', type=int, default=1)
     parser.add_argument('--eval_steps', type=int, default=5)
     parser.add_argument('--kill_cnt', dest='kill_cnt', default=100, type=int, help='early stopping')
@@ -289,6 +302,7 @@ def main():
     args = parser.parse_args()
 
     init_seed(args.seed)
+    args.test_batch_size = args.batch_size if args.test_batch_size is None else args.test_batch_size
 
     if args.eval:
         eval_model(args)

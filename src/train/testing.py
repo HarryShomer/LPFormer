@@ -2,8 +2,8 @@ import torch
 from torch_scatter import scatter
 from tqdm import tqdm
 from torch.utils.data import DataLoader
-from ogb.linkproppred import PygLinkPropPredDataset, Evaluator
-from collections import defaultdict
+
+from time import perf_counter
 
 from util.utils import *
 from train.evaluation import get_metric_score, get_metric_score_citation2, evaluate_hits, evaluate_mrr, get_ranking_list
@@ -57,7 +57,6 @@ def test_citation2(model, score_func, data, evaluator_hit, evaluator_mrr, batch_
 
     with torch.no_grad():
         h = model.propagate()
-        # h = None
 
         neg_valid_pred = test_edge_citation2(model, score_func, data['valid_pos'], h, batch_size, mrr_mode=True, negative_data=data['valid_neg'])
         pos_valid_pred = test_edge_citation2(model, score_func, data['valid_pos'], h, batch_size)
@@ -93,27 +92,32 @@ def test_edge(model, score_func, input_data, batch_size, test_set=False, dump_at
 
 
 @torch.no_grad()
-def test_edge_heart(score_func, input_data, h, batch_size,  negative_data):
+def test_heart_negatives(negative_data, model, score_func, batch_size=32768, test_set=False):
     """
     For HeaRT setting
-    """
-    pos_preds = []
+    """    
     neg_preds = []
-        
-    for perm in DataLoader(range(input_data.size(0)),  batch_size):
-        pos_edges = input_data[perm].t()
-        neg_edges = torch.permute(negative_data[perm], (2, 0, 1))
+    num_negative = negative_data.size(1)
+    negative_data = torch.permute(negative_data, (2, 0, 1)).reshape(2, -1).t()
 
-        pos_scores = score_func(h[pos_edges[0]], h[pos_edges[1]]).cpu()
-        neg_scores = score_func(h[neg_edges[0]], h[neg_edges[1]]).cpu()
+    # TODO: Move to parent function so only run once
+    h = model.propagate()
 
-        pos_preds += [pos_scores]
-        neg_preds += [neg_scores]
-    
-    neg_preds = torch.cat(neg_preds, dim=0)
-    pos_preds = torch.cat(pos_preds, dim=0)
+    qqq = DataLoader(range(negative_data.size(0)),  batch_size)
+    # qqq = tqdm(qqq, "Testing")
 
-    return pos_preds, neg_preds
+    for perm in qqq:
+        neg_edges = negative_data[perm].t().to(h.device)
+
+        elementwise_feats = model.elementwise_lin(h[neg_edges[0]] * h[neg_edges[1]])
+        pairwise_feats, _ = model.calc_pairwise(neg_edges, h, test_set=test_set)
+        combined_feats = torch.cat((elementwise_feats, pairwise_feats), dim=-1)
+
+        neg_preds += [score_func(combined_feats).squeeze().cpu()]
+
+    neg_preds = torch.cat(neg_preds, dim=0).view(-1, num_negative)
+
+    return neg_preds
 
 
 def test(
@@ -130,21 +134,28 @@ def test(
     model.eval()
     score_func.eval()
 
-    test_edge_func = test_edge_heart if heart else test_edge
-    
     with torch.no_grad():
-        pos_train_pred = test_edge_func(model, score_func, data['train_pos_val'], batch_size)
+        pos_train_pred = test_edge(model, score_func, data['train_pos_val'], batch_size)
+        pos_valid_pred = test_edge(model, score_func, data['valid_pos'], batch_size)
+        pos_test_pred = test_edge(model, score_func, data['test_pos'], batch_size, test_set=True, dump_att=dump_att)
 
-        pos_valid_pred = test_edge_func(model, score_func, data['valid_pos'], batch_size)
-        neg_valid_pred = test_edge_func(model, score_func, data['valid_neg'], batch_size)
+        if heart:
+            neg_valid_pred = test_heart_negatives(data['valid_neg'], model, score_func, batch_size=batch_size)
+            neg_test_pred = test_heart_negatives(data['test_neg'], model, score_func, batch_size=batch_size, test_set=True)
 
-        pos_test_pred = test_edge_func(model, score_func, data['test_pos'], batch_size, test_set=True, dump_att=dump_att)
-        neg_test_pred = test_edge_func(model, score_func, data['test_neg'], batch_size, test_set=True, dump_att=dump_att)
+            pos_valid_pred = pos_valid_pred.view(-1)
+            pos_test_pred = pos_test_pred.view(-1)
+            pos_train_pred = pos_train_pred.view(-1)
+            
+            result = get_metric_score_citation2(evaluator_mrr, pos_train_pred, pos_valid_pred, neg_valid_pred, pos_test_pred, neg_test_pred)
+        else:
+            neg_valid_pred = test_edge(model, score_func, data['valid_neg'], batch_size)
+            neg_test_pred = test_edge(model, score_func, data['test_neg'], batch_size, test_set=True, dump_att=dump_att)
 
-        neg_valid_pred, pos_valid_pred = torch.flatten(neg_valid_pred),  torch.flatten(pos_valid_pred)
-        pos_test_pred, neg_test_pred = torch.flatten(pos_test_pred), torch.flatten(neg_test_pred)
-
-        result = get_metric_score(evaluator_hit, evaluator_mrr, pos_train_pred, pos_valid_pred, neg_valid_pred, pos_test_pred, neg_test_pred, k_list)
+            neg_valid_pred, pos_valid_pred = torch.flatten(neg_valid_pred),  torch.flatten(pos_valid_pred)
+            pos_test_pred, neg_test_pred = torch.flatten(pos_test_pred), torch.flatten(neg_test_pred)
+            
+            result = get_metric_score(evaluator_hit, evaluator_mrr, pos_train_pred, pos_valid_pred, neg_valid_pred, pos_test_pred, neg_test_pred, k_list)
 
     return result
 

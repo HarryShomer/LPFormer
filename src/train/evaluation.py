@@ -19,6 +19,7 @@ def evaluate_hits(evaluator, pos_pred, neg_pred, k_list):
 
 
 
+
 def evaluate_mrr(y_pred_pos, y_pred_neg):
     '''
         compute mrr
@@ -47,6 +48,27 @@ def evaluate_mrr(y_pred_pos, y_pred_neg):
                 'MRR': mrr_list.mean().item()}
 
     return results
+
+
+def sample_level_hits(y_pred_pos, y_pred_neg):
+    """
+    Hits on sample level
+    """
+    # calculate ranks
+    y_pred_pos = y_pred_pos.view(-1, 1)
+    # optimistic rank: "how many negatives have at least the positive score?"
+    # ~> the positive is ranked first among those with equal score
+    optimistic_rank = (y_pred_neg >= y_pred_pos).sum(dim=1)
+    # pessimistic rank: "how many negatives have a larger score than the positive?"
+    # ~> the positive is ranked last among those with equal score
+    pessimistic_rank = (y_pred_neg > y_pred_pos).sum(dim=1)
+    ranking_list = 0.5 * (optimistic_rank + pessimistic_rank) + 1
+
+    hits20_list = (ranking_list <= 20).to(torch.float)
+    hits50_list = (ranking_list <= 50).to(torch.float)
+    hits100_list = (ranking_list <= 100).to(torch.float)
+
+    return {"Hits@20": hits20_list, "Hits@50": hits50_list, "Hits@100": hits100_list}
 
 
 def get_ranking_list(y_pred_pos, y_pred_neg):

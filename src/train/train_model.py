@@ -12,7 +12,7 @@ from util.utils import *
 from train.testing import *
 
 from models.other_models import mlp_score
-from models.link_transformer import LinkTransformer
+from models.link_transformer import LinkTransformer, NUM_NODES_CHOSEN
 
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "dataset")
@@ -29,7 +29,7 @@ def train_epoch(model, score_func, data, optimizer, args, device):
 
     total_loss = total_examples = 0
     d = DataLoader(range(train_pos.size(0)), args.batch_size, shuffle=True)
-    # d = tqdm(d, "Epoch") #if args.verbose else d
+    d = tqdm(d, "Epoch") #if args.verbose else d
     
     for perm in d:
         edges = train_pos[perm].t()
@@ -77,7 +77,11 @@ def train_epoch(model, score_func, data, optimizer, args, device):
 
         num_examples = pos_out.size(0)
         total_loss += loss.item() * num_examples
-        total_examples += num_examples     
+        total_examples += num_examples   
+
+    # for k, v in NUM_NODES_CHOSEN.items():
+    #     print(k, np.mean(v))
+    # exit()
 
     return total_loss / total_examples
 
@@ -155,7 +159,7 @@ def train_data(args, train_args, data, device, verbose=True):
         'Hits@50': Logger(args.runs),
         'Hits@100': Logger(args.runs),
     }
-    if "citation" in data['dataset'] or data['dataset'] in ['cora', 'citeseer', 'pubmed'] or args.heart:
+    if "citation" in data['dataset'] or data['dataset'] in ['cora', 'citeseer', 'pubmed',  'chameleon', 'squirrel'] or args.heart:
         loggers['MRR'] = Logger(args.runs)
 
     # Over N splits

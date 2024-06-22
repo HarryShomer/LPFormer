@@ -121,8 +121,8 @@ def get_ppr_matrix(edge_index, num_nodes, alpha=0.15, eps=5e-5):
     neighbors, neighbor_weights = get_calc_ppr()(indptr, edge_index_np[1], out_degree, alpha, eps)
     print(f"Time: {time()-start:.2f} seconds")
 
-    print("\n# Nodes with 0 PPR scores:", sum([len(x) == 1 for x in neighbors]))  # 1 bec. itself
-    print(f"Mean # of scores per Node: {np.mean([len(x) for x in neighbors]):.1f}")
+    # print("\n# Nodes with 0 PPR scores:", sum([len(x) == 1 for x in neighbors]))  # 1 bec. itself
+    # print(f"Mean # of scores per Node: {np.mean([len(x) for x in neighbors]):.1f}")
 
     return neighbors, neighbor_weights
 
@@ -242,37 +242,30 @@ def create_sparse_ppr_matrix(neighbors, neighbor_weights):
 
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--data_name', type=str)
-    parser.add_argument("--eps", help="Stopping criterion threshold", type=float, default=5e-5)
-    parser.add_argument("--alpha", help="Teleportation probability", type=float, default=0.15)
-    parser.add_argument("--use-val-in-test", action='store_true', default=False)
-    args = parser.parse_args()
+def get_ppr(dataset, edge_index, num_nodes, alpha, eps, is_val):
+    """
+    If PPR exists then load it in. Otherwise calculate it
+    """
+    root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..")
+    dataset_dir = os.path.join(root_dir, "node_subsets", "ppr", dataset)
+    os.makedirs(dataset_dir, exist_ok=True)
 
-    if args.data_name.lower() in ['cora', 'citeseer', 'pubmed']:
-        data = read_data_planetoid(args)
-        neighbors, neighbor_weights = get_ppr_matrix(data['edge_index'], data['num_nodes'], args.alpha, args.eps)
-        sparse_adj = create_sparse_ppr_matrix(neighbors, neighbor_weights)
-        save_results(args.data_name, sparse_adj, args.alpha, args.eps)
+    val_suf = "_val" if is_val else ""
+    alpha_str = str(alpha).replace('.', '')
+    eps_str = str(eps).replace('.', '')
+    filename = f"sparse_adj-{alpha_str}_eps-{eps_str}" + val_suf + ".pt"
+    full_filename = os.path.join(dataset_dir, filename)
+
+    if os.path.isfile(full_filename):
+        print("PPR matrix exists. Loading from file...", flush=True)
+        sparse_adj = torch.load(full_filename)
     else:
-        dataset = PygLinkPropPredDataset(name=args.data_name)
-        data = dataset[0]
-
-        neighbors, neighbor_weights = get_ppr_matrix(data['edge_index'], data['num_nodes'], args.alpha, args.eps)
+        neighbors, neighbor_weights = get_ppr_matrix(edge_index, num_nodes, alpha, eps)
         sparse_adj = create_sparse_ppr_matrix(neighbors, neighbor_weights)
-        save_results(args.data_name, sparse_adj, args.alpha, args.eps)
 
-        if args.use_val_in_test:
-            print("Running for Test...")
-            split_edge = dataset.get_edge_split()
-            val_edge_index = to_undirected(split_edge['valid']['edge'].t())
-            full_edge_index = torch.cat([data['edge_index'], val_edge_index], dim=-1)
+        print(f"Saving data to {full_filename}...", flush=True)
+        torch.save(sparse_adj, full_filename)
+    
+    # HACK: Stored as a SparseTensor. Convert to torch.sparse
+    return sparse_adj.to_torch_sparse_coo_tensor()
 
-            neighbors, neighbor_weights = get_ppr_matrix(full_edge_index, data['num_nodes'], args.alpha, args.eps)
-            sparse_adj = create_sparse_ppr_matrix(neighbors, neighbor_weights)
-            save_results(args.data_name, sparse_adj, args.alpha, args.eps, val=True)
-
-
-if __name__ == "__main__":
-    main()

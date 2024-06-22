@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from time import perf_counter
 
 from util.utils import *
-from train.evaluation import get_metric_score, get_metric_score_citation2, evaluate_hits, evaluate_mrr, get_ranking_list
+from train.evaluation import get_metric_score, get_metric_score_citation2, evaluate_hits, evaluate_mrr, sample_level_hits
 
 
 
@@ -129,10 +129,15 @@ def test(
         batch_size, 
         k_list=[100],
         heart=False,
-        dump_att=False
+        dump_att=False,
+        dump_test=False,  # Get performance on sample level
+        metric="Hits@100"
     ):
     model.eval()
     score_func.eval()
+
+    # DEBUG: PPA
+    # data['test_pos'] = data['test_pos'][:200000]
 
     with torch.no_grad():
         pos_train_pred = test_edge(model, score_func, data['train_pos_val'], batch_size)
@@ -153,9 +158,19 @@ def test(
             neg_test_pred = test_edge(model, score_func, data['test_neg'], batch_size, test_set=True, dump_att=dump_att)
 
             neg_valid_pred, pos_valid_pred = torch.flatten(neg_valid_pred),  torch.flatten(pos_valid_pred)
-            pos_test_pred, neg_test_pred = torch.flatten(pos_test_pred), torch.flatten(neg_test_pred)
             
-            result = get_metric_score(evaluator_hit, evaluator_mrr, pos_train_pred, pos_valid_pred, neg_valid_pred, pos_test_pred, neg_test_pred, k_list)
+            result = get_metric_score(evaluator_hit, evaluator_mrr, pos_train_pred, pos_valid_pred, 
+                                      neg_valid_pred, pos_test_pred, neg_test_pred, k_list)
+            
+    if dump_test:
+        all_sample_hits = []
+
+        for perm in tqdm(DataLoader(range(pos_test_pred.size(0)),  4096), "Sample-Level Hits"):
+            a = sample_level_hits(pos_test_pred[perm], neg_test_pred)
+            all_sample_hits += [a[metric]]
+        
+        all_sample_hits = torch.cat(all_sample_hits)
+        return result, all_sample_hits
 
     return result
 
@@ -304,7 +319,7 @@ def test_by_all(
         print("# Feat =", only_feat_ix.sum().item() if feat_sim is not None else "NA")
         print("# Global =", only_global_ix.sum().item())
         
-        if data['dataset'] in ['ogbl-citation2', 'cora', 'citeseer', 'pubmed']:
+        if data['dataset'] in ['ogbl-citation2', 'cora', 'citeseer', 'pubmed', 'chameleon', 'squirrel']:
             # print("---", pos_test_pred[only_cn_ix].shape, neg_test_pred[only_cn_ix].shape)
             # exit()
             all_results[f"CN"] = evaluate_mrr(pos_test_pred[only_cn_ix], neg_test_pred)

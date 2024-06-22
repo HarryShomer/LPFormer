@@ -117,17 +117,8 @@ def eval_model(cmd_args):
     else:
         cmd_args.metric = 'MRR'
 
-
-    if "ogb" in data['dataset']:
-        ppr_scores = torch.load(f"heuristic_data/{data['dataset']}_ppr_scores.pt")
-    else:
-        ppr_scores = compute_all_ppr(data, data['test_pos'], test_set=True)
-    print(">>>", ppr_scores.shape)
-
     # Results by CN range
-    # TODO: Rand split
     if cmd_args.runs > 1:
-        cn_all_seed_results = defaultdict(list)
         all_seed_results = []
 
         for run in range(1, cmd_args.runs+1):
@@ -138,19 +129,16 @@ def eval_model(cmd_args):
             # Cumulative Results
             # TODO: Citation2
             # q = test(model, score_func, data, evaluator_hit, evaluator_mrr, cmd_args.batch_size, k_list=k_list)
-            # all_seed_results.append(q[cmd_args.metric][-1])
+            q, k = test(model, score_func, data, evaluator_hit, evaluator_mrr, 
+                        cmd_args.batch_size, k_list=k_list, dump_test=True, metric=cmd_args.metric)
+            all_seed_results.append(q[cmd_args.metric][-1])
 
-            seed_results = test_by_all(model, score_func, data, evaluator_hit, 
-                                       evaluator_mrr, cmd_args, ppr_scores, k_list=k_list)
+            ###################################
+            file_preds = os.path.join("data", f"{data['dataset']}_lpformer_test_preds_seed-{run}.pt")
+            samples_preds = torch.cat([data['test_pos'].cpu(), k.unsqueeze(-1)], dim=-1)
+            torch.save(samples_preds, file_preds)
+            ###################################
 
-            # print(seed_results)
-            for k, v in seed_results.items():
-                cn_all_seed_results[k].append(v[cmd_args.metric])
-        
-        # By Range
-        print("\n\n")
-        for k, v in cn_all_seed_results.items():
-            print(f"{k} => {np.mean(v)}")
 
         # Cumulative
         print("\nMean Performance:")
@@ -175,7 +163,7 @@ def run_model(cmd_args):
     device = torch.device(f'cuda:{cmd_args.device}' if torch.cuda.is_available() else 'cpu')
     # device = "cpu"  # DEBUG
 
-    if cmd_args.data_name.lower() in ['cora', 'citeseer', 'pubmed']:
+    if cmd_args.data_name.lower() in ['cora', 'citeseer', 'pubmed', 'chameleon', 'squirrel']:
         data = read_data_planetoid(cmd_args, device)
     else:
         data = read_data_ogb(cmd_args, device)

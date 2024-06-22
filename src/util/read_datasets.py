@@ -10,6 +10,8 @@ from torch_geometric.utils import to_undirected, degree
 import joblib  # Make ogb loads faster...idk
 from ogb.linkproppred import PygLinkPropPredDataset
 
+from util.calc_ppr_scores import get_ppr
+
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "..", "dataset")
 HEART_DIR = os.path.join(DATA_DIR, "heart")
@@ -82,7 +84,6 @@ def read_data_ogb(args, device):
         
     data_obj['adj_t'] = SparseTensor.from_edge_index(edge_index, edge_weight.squeeze(-1), [data.num_nodes, data.num_nodes]).to(device)
 
-    
     # TODO: Needed since directed graph
     if args.data_name == 'ogbl-citation2': 
         data_obj['adj_t'] = data_obj['adj_t'].to_symmetric().coalesce()
@@ -111,21 +112,18 @@ def read_data_ogb(args, device):
         data_obj['full_adj_t'] = data_obj['adj_t']
         data_obj['full_adj_mask'] = data_obj['adj_mask']
 
-
     data_obj['degree'] = degree(edge_index[0], num_nodes=data_obj['num_nodes']).to(device)
     if args.use_val_in_test:
         data_obj['degree_test'] = degree(full_edge_index[0], num_nodes=data_obj['num_nodes']).to(device)
 
     ### Load PPR matrix
-    ### HACK: Stored as a SparseTensor. Convert to torch.sparse
     print("Reading PPR...", flush=True)
-    ppr_dir = os.path.join(DATA_DIR, "..", "node_subsets", "ppr", args.data_name)
-    data_obj['ppr'] = torch.load(os.path.join(ppr_dir, f"sparse_adj-015_eps-{str(args.eps).replace('.', '')}.pt")).to(device)
-    data_obj['ppr'] = data_obj['ppr'].to_torch_sparse_coo_tensor()
+    data_obj['ppr'] = get_ppr(args.data_name, edge_index, data['num_nodes'],
+                              0.15, args.eps, False).to(device)  
 
     if args.use_val_in_test:
-        data_obj['ppr_test'] = torch.load(os.path.join(ppr_dir, f"sparse_adj-015_eps-{str(args.eps).replace('.', '')}_val.pt")).to(device)
-        data_obj['ppr_test'] = data_obj['ppr_test'].to_torch_sparse_coo_tensor()
+        data_obj['ppr'] = get_ppr(args.data_name, data['full_edge_index'], data['num_nodes'],
+                                0.15, args.eps, True).to(device)  
     else:
         data_obj['ppr_test'] = data_obj['ppr']
 
@@ -238,9 +236,8 @@ def read_data_planetoid(args, device):
     data['degree'] = degree(data['edge_index'][0], num_nodes=data['num_nodes']).to(device)
 
     ### Load PPR Matrix
-    ppr_dir = os.path.join(DATA_DIR, "..", "node_subsets", "ppr", args.data_name)
-    data['ppr'] = torch.load(os.path.join(ppr_dir, f"sparse_adj-015_eps-{str(args.eps).replace('.', '')}.pt")).to(device)
-    data['ppr'] = data['ppr'].to_torch_sparse_coo_tensor().to(device)
+    data['ppr'] = get_ppr(args.data_name, data['edge_index'], data['num_nodes'],
+                          0.15, args.eps, False).to(device)
     data['ppr_test'] = data['ppr']
 
     # Overwrite standard negative
@@ -279,3 +276,5 @@ def filter_by_year(data, split_edge, year=2007):
     data.edge_index = new_edge_index
     data.edge_weight = new_edge_weight.unsqueeze(-1)
     return data, split_edge
+
+

@@ -1,6 +1,6 @@
 # LPFormer
 
-Official Implementation of the paper "LPFormer: An Adaptive Graph Transformer for Link Prediction"
+Official Implementation of the KDD'24 paper - "LPFormer: An Adaptive Graph Transformer for Link Prediction"
 
 ![Framework](https://raw.githubusercontent.com/HarryShomer/LPFormer/master/LPFormer-Framework.png)
 
@@ -25,13 +25,13 @@ The data for Cora, Citeseer, and Pubmed can be downloaded from [here](https://gi
 ## Reproduce Results
 
 
-### Compute PPR Matrices
+<!-- ### Compute PPR Matrices
 
 Before being able to reproduce the results, you must calculate the PPR matrices for each dataset. This can be done for each dataset by running:
 ```
 bash scripts/calc_ppr_matrices.sh
 ```
-The parameter `--eps` controls the approximation accuracy. If you'd like a better (or worse) approximation of the PPR scores, please adjust `--eps` accordingly. Please note that for larger datasets, a very lower epsilon may take a very long time to run and will result in a large file saved to the disk.
+The parameter `--eps` controls the approximation accuracy. If you'd like a better (or worse) approximation of the PPR scores, please adjust `--eps` accordingly. Please note that for larger datasets, a very lower epsilon may take a very long time to run and will result in a large file saved to the disk. -->
 
 
 ### Reproduce the Paper Results
@@ -39,12 +39,19 @@ The parameter `--eps` controls the approximation accuracy. If you'd like a bette
 The commands for reproducing the results on the existing setting in the paper are in the `scripts/replicate_existing.sh` file. For the HeaRT setting, they are in `scripts/replicate_heart.sh`. Please note that for the ogbl-citation2 and ogbl-ddi, over 32GB of GPU memory is required to train the model.  
 
 
+### Running Yourself
+
+1. To add a new dataset, you'll need to add a custom function in `src/util/read_datasets.py`. Then add the option to call that function in `run_model` in `src/run.py`.
+2. When computing the PPR matrix, the parameter `--eps` controls the approximation accuracy. If you'd like a better (or worse) approximation of the PPR scores, please adjust `--eps` accordingly. Please note that for larger datasets, a very lower epsilon may take a very long time to run and will result in a large file saved to the disk.
+3. The list of hyperparameters can be found by looking at one of the sample commands in either `scripts/replicate_existing.sh` or `scripts/replicate_heart.sh`.
+
+
 ## Cite
 ```
-@article{shomer2023adaptive,
+@article{shomer2024adaptive,
       title={LPFormer: An Adaptive Graph Transformer for Link Prediction}, 
       author={Harry Shomer and Yao Ma and Haitao Mao and Juanhui Li and Bo Wu and Jiliang Tang},
-      journal={arXiv preprint arXiv:2310.11009},
-      year={2023}
+      booktitle={Proceedings of the 30th ACM SIGKDD Conference on Knowledge Discovery and Data Mining},
+      year={2024}
 }
 ```

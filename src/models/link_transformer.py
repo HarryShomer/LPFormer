@@ -3,6 +3,8 @@ import torch
 import torch.nn as nn
 from torch_scatter import scatter 
 from torch.nn.init import uniform_
+import numpy as np 
+
 
 from models.other_models import *
 from modules.node_encoder import NodeEncoder
@@ -12,6 +14,9 @@ from time import perf_counter
 
 import warnings
 warnings.filterwarnings("ignore")
+
+
+NUM_NODES_CHOSEN = {"cn": [], "1-hop": [], ">1-hop": [], "all": []}
 
 
 class LinkTransformer(nn.Module):
@@ -159,6 +164,7 @@ class LinkTransformer(nn.Module):
         k_i, k_j = X_node[batch[0]], X_node[batch[1]]
         pairwise_feats = torch.cat((k_i, k_j), dim=-1)
 
+
         if self.mask == "cn":
             cn_info, _, _ = self.compute_node_mask(batch, test_set, adj_mask)
             node_mask = cn_info[0]
@@ -173,15 +179,19 @@ class LinkTransformer(nn.Module):
 
         else:
             cn_info, onehop_info, non1hop_info = self.compute_node_mask(batch, test_set, adj_mask)
-
-            # print(non1hop_info[0].shape)
-
+            
             if non1hop_info is not None:
                 all_mask = torch.cat((cn_info[0], onehop_info[0], non1hop_info[0]), dim=-1)
                 pes = self.get_pos_encodings(cn_info, onehop_info, non1hop_info)
             else:
                 all_mask = torch.cat((cn_info[0], onehop_info[0]), dim=-1)
                 pes = self.get_pos_encodings(cn_info, onehop_info)
+
+            # NOTE: Random Mask!
+            # all_info = self.compute_node_mask_random(batch, test_set, adj_mask)
+            # pes = self.get_pos_encodings(all_info)
+            # all_mask = all_info[0]
+            # NUM_NODES_CHOSEN['all'].append(all_mask.shape[1] / batch.size(1))
 
             for l in range(self.num_layers):
                 pairwise_feats, att_weights = self.att_layers[l](all_mask, pairwise_feats, X_node, pes, None, return_weights)
@@ -270,7 +280,7 @@ class LinkTransformer(nn.Module):
 
             cn_filt_cond = (src_ppr >= thresh_cn) & (tgt_ppr >= thresh_cn)
             onehop_filt_cond = (src_ppr >= thresh_1hop) & (tgt_ppr >= thresh_1hop)
-
+        
             if self.mask != "cn":
                 filt_cond = torch.where(node_type == 1, onehop_filt_cond, cn_filt_cond)
             else:
@@ -461,11 +471,6 @@ class LinkTransformer(nn.Module):
 
         return output
 
-
-    ###################################################################################################
-    ###################################################################################################
-    ###################################################################################################
-
     def get_non_1hop_ppr(self, batch, test_set=False):
         """
         Get PPR scores for non-1hop nodes.
@@ -513,12 +518,58 @@ class LinkTransformer(nn.Module):
         ppr_condition = (src_vals >= self.thresh_non1hop) & (tgt_vals >= self.thresh_non1hop)
         src_ix, src_vals, tgt_vals = src_ix[:, ppr_condition], src_vals[ppr_condition], tgt_vals[ppr_condition]
 
-        # print(src_ix.shape, src_vals.shape)
-        # print(tgt_ix.shape, tgt_vals.shape)
-        # print("--------------------------------------")
-        # exit()
-
         return src_ix, src_vals, tgt_vals
 
 
+    ###################################################################################################
+    ###################################################################################################
+    ###################################################################################################
 
+
+    def compute_node_mask_random(self, batch, test_set, adj):
+        """
+        Select random nodes instead of via PPR
+        """
+        ### Select k random nodes for each sample in batch
+        k = 29
+        # node_mask = torch.zeros((batch.size(1), self.num_nodes))
+        # node_mask[:, :k] = 1
+        # node_mask = node_mask[:,torch.randperm(node_mask.size()[1])]
+
+        """
+        1. {
+            For b in batch_size:
+                Draw k entities in [0, num_entities-1]
+        }
+        2. Use to create "edge_index" 
+        3. convert edge_index to coo
+        4. Rest is the same
+        """
+        rand_nodes = np.random.choice(self.num_nodes, size=k*batch.size(1))
+        rand_nodes = torch.from_numpy(rand_nodes)
+        rand_nodes = rand_nodes.to(self.device)
+
+        batch_ix = [torch.ones(k) * l for l in range(batch.size(1))]
+        batch_ix = torch.cat(batch_ix).to(self.device)
+
+        node_mask = torch.stack((batch_ix, rand_nodes))
+
+        node_mask_sparse = torch.sparse_coo_tensor(node_mask, torch.ones(node_mask.size(1), device=self.device), 
+                                                   size=(batch.size(1), self.num_nodes)).to(self.device)
+
+        # node_mask_sparse = node_mask.to_sparse()
+
+        ppr = self.get_ppr(test_set)
+        src_ppr = torch.index_select(ppr, 0, batch[0])
+        tgt_ppr = torch.index_select(ppr, 0, batch[1])
+
+
+        src_ppr = (src_ppr + node_mask_sparse) * node_mask_sparse
+        tgt_ppr = (tgt_ppr + node_mask_sparse) * node_mask_sparse
+
+        src_ix = src_ppr.coalesce().indices()
+        src_vals = src_ppr.coalesce().values() - 1
+        tgt_vals = tgt_ppr.coalesce().values() - 1
+
+        return src_ix, src_vals, tgt_vals
+    

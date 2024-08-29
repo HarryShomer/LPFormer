@@ -48,10 +48,11 @@ The commands for reproducing the results on the existing setting in the paper ar
 
 ## Cite
 ```
-@article{shomer2024adaptive,
-      title={LPFormer: An Adaptive Graph Transformer for Link Prediction}, 
-      author={Harry Shomer and Yao Ma and Haitao Mao and Juanhui Li and Bo Wu and Jiliang Tang},
-      booktitle={Proceedings of the 30th ACM SIGKDD Conference on Knowledge Discovery and Data Mining},
-      year={2024}
+@inproceedings{shomer2024lpformer,
+  title={LPFormer: An Adaptive Graph Transformer for Link Prediction},
+  author={Shomer, Harry and Ma, Yao and Mao, Haitao and Li, Juanhui and Wu, Bo and Tang, Jiliang},
+  booktitle={Proceedings of the 30th ACM SIGKDD Conference on Knowledge Discovery and Data Mining},
+  pages={2686--2698},
+  year={2024}
 }
 ```

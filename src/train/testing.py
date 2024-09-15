@@ -136,9 +136,6 @@ def test(
     model.eval()
     score_func.eval()
 
-    # DEBUG: PPA
-    # data['test_pos'] = data['test_pos'][:200000]
-
     with torch.no_grad():
         pos_train_pred = test_edge(model, score_func, data['train_pos_val'], batch_size)
         pos_valid_pred = test_edge(model, score_func, data['valid_pos'], batch_size)

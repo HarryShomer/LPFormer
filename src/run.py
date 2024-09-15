@@ -31,14 +31,11 @@ def save_test_att(cmd_args):
         "trans_layers": cmd_args.tlayers,
         "residual": cmd_args.residual,
         "layer_norm": not cmd_args.no_layer_norm,
+        "mask_input": cmd_args.mask_input,
+        "thresh_1hop": cmd_args.thresh_1hop,
+        "thresh_cn": cmd_args.thresh_cn,
+        "thresh_non1hop": cmd_args.thresh_non1hop
     }  
-
-    fields = ['thresh_1hop', "mask_input", "count_ra", "filter_1hop", 
-              "filter_cn", "thresh_cn", "thresh_non1hop", "ablate_att", 
-              "ablate_pe", "ablate_feats", "ablate_ppr", "ablate_counts",
-              ]
-    for f in fields:
-        args[f] = getattr(cmd_args, f)
 
     model = LinkTransformer(args, data, device=device)
     score_func = mlp_score(model.out_dim, model.out_dim, 1, cmd_args.pred_layers)
@@ -85,16 +82,12 @@ def eval_model(cmd_args):
         "trans_layers": cmd_args.tlayers,
         "residual": cmd_args.residual,
         "layer_norm": not cmd_args.no_layer_norm,
-        "relu": not cmd_args.no_relu
+        "relu": not cmd_args.no_relu,
+        "mask_input": cmd_args.mask_input,
+        "thresh_1hop": cmd_args.thresh_1hop,
+        "thresh_cn": cmd_args.thresh_cn,
+        "thresh_non1hop": cmd_args.thresh_non1hop
     }  
-
-    fields = ['thresh_1hop', "mask_input", "count_ra",  
-              "filter_1hop", "filter_cn", "thresh_cn", "thresh_non1hop", 
-              "ablate_att", "ablate_pe", "ablate_feats", "ablate_ppr", 
-              "ablate_counts", "ablate_ppr_type"
-              ]
-    for f in fields:
-        args[f] = getattr(cmd_args, f)
 
     model = LinkTransformer(args, data, device=device)
     score_func = mlp_score(model.out_dim, model.out_dim, 1, cmd_args.pred_layers)
@@ -204,17 +197,12 @@ def run_model(cmd_args):
         "feat_drop": cmd_args.feat_drop,
         "residual": cmd_args.residual,
         "layer_norm": not cmd_args.no_layer_norm,
-        "relu": not cmd_args.no_relu
+        "relu": not cmd_args.no_relu,
+        "mask_input": cmd_args.mask_input,
+        "thresh_1hop": cmd_args.thresh_1hop,
+        "thresh_cn": cmd_args.thresh_cn,
+        "thresh_non1hop": cmd_args.thresh_non1hop
     }
-
-    # Important shit from argparse
-    fields = ['thresh_1hop', "mask_input", "count_ra",  
-              "filter_1hop", "filter_cn", "thresh_cn", "thresh_non1hop", 
-              "ablate_att", "ablate_pe", "ablate_feats", "ablate_ppr", 
-              "ablate_counts", "ablate_ppr_type"
-              ]
-    for f in fields:
-        args[f] = getattr(cmd_args, f)
 
     train_data(cmd_args, args, data, device, verbose = not cmd_args.non_verbose)
 
@@ -274,18 +262,6 @@ def main():
     parser.add_argument('--thresh-cn', type=float, default=1e-2)
     parser.add_argument('--thresh-1hop', type=float, default=1e-2)
     parser.add_argument('--thresh-non1hop', type=float, default=1e-2)
-
-    parser.add_argument("--filter-cn", action='store_true', default=False)
-    parser.add_argument("--filter-1hop", action='store_true', default=False)
-    parser.add_argument("--count-ra", action='store_true', default=False)
-
-    # Ablation study params
-    parser.add_argument("--ablate-att", action='store_true', default=False)
-    parser.add_argument("--ablate-pe", action='store_true', default=False)
-    parser.add_argument("--ablate-feats", action='store_true', default=False)
-    parser.add_argument("--ablate-ppr", action='store_true', default=False)
-    parser.add_argument("--ablate-counts", action='store_true', default=False)
-    parser.add_argument("--ablate-ppr-type", action='store_true', default=False)
 
     args = parser.parse_args()
 

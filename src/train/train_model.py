@@ -5,6 +5,7 @@ from datetime import datetime
 from torch.utils.data import DataLoader
 from torch_sparse import SparseTensor
 
+
 import joblib  # Make ogb loads faster...idk
 from ogb.linkproppred import PygLinkPropPredDataset, Evaluator
 
@@ -12,7 +13,7 @@ from util.utils import *
 from train.testing import *
 
 from models.other_models import mlp_score
-from models.link_transformer import LinkTransformer, NUM_NODES_CHOSEN
+from models.link_transformer import LinkTransformer
 
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "dataset")
@@ -78,10 +79,6 @@ def train_epoch(model, score_func, data, optimizer, args, device):
         num_examples = pos_out.size(0)
         total_loss += loss.item() * num_examples
         total_examples += num_examples   
-
-    # for k, v in NUM_NODES_CHOSEN.items():
-    #     print(k, np.mean(v))
-    # exit()
 
     return total_loss / total_examples
 

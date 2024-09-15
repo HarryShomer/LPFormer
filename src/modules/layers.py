@@ -119,13 +119,7 @@ class LinkAttention(MessagePassing):
         self.share_weights = share_weights
         self.lin_edge = None  # No edge embedding
 
-        self.ncn_att = train_args['ablate_att']
-        self.no_pe = train_args['ablate_pe']
-        self.no_feats = train_args['ablate_feats']
-
         out_dim = 2
-        if self.no_pe or self.no_feats:
-            out_dim -= 1
 
         if node_dim is None:
             node_dim = in_channels * out_dim
@@ -208,29 +202,22 @@ class LinkAttention(MessagePassing):
     ):
         H, C = self.heads, self.out_channels
 
-        if pe_att is not None and not self.no_pe:
+        if pe_att is not None:
             x_j = torch.cat((x_j, pe_att), dim=-1)
 
-        # Conditions to avoid for ablation study - just inclusion of feature info
-        if not self.no_feats:        
-            x_j = self.lin_r(x_j).view(-1, H, C)
+        x_j = self.lin_r(x_j).view(-1, H, C)
 
-            # e=(a, b) attending to v 
-            # x_a * x_v + x_b * x_v
-            e1, e2 = x_i.chunk(2, dim=-1)
-            e1 = self.lin_l(e1).view(-1, H, C)
-            e2 = self.lin_l(e2).view(-1, H, C)
-            x = x_j * (e1 + e2)
-        elif self.no_feats:
-            x = x_j = self.lin_r(pe_att).view(-1, H, C)
+        # e=(a, b) attending to v 
+        # x_a * x_v + x_b * x_v
+        e1, e2 = x_i.chunk(2, dim=-1)
+        e1 = self.lin_l(e1).view(-1, H, C)
+        e2 = self.lin_l(e2).view(-1, H, C)
+        x = x_j * (e1 + e2)
         
         x = F.leaky_relu(x, self.negative_slope)
         alpha = (x * self.att).sum(dim=-1)
 
-        if self.ncn_att:  # Ablation - Set all att weights=1 like in NCN/NCNC
-            alpha = torch.ones_like(alpha, device=alpha.device)
-        else:
-            alpha = softmax(alpha, index, ptr, size_i)
+        alpha = softmax(alpha, index, ptr, size_i)
         
         self._alpha = alpha
 

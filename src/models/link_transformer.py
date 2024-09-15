@@ -10,13 +10,9 @@ from models.other_models import *
 from modules.node_encoder import NodeEncoder
 from modules.layers import LinkTransformerLayer
 
-from time import perf_counter
-
 import warnings
 warnings.filterwarnings("ignore")
 
-
-NUM_NODES_CHOSEN = {"cn": [], "1-hop": [], ">1-hop": [], "all": []}
 
 
 class LinkTransformer(nn.Module):
@@ -34,7 +30,6 @@ class LinkTransformer(nn.Module):
         self.train_args = train_args
         self.data = data
         self.device = device
-        self.count_ra = train_args['count_ra']
 
         # PPR Thresholds
         self.thresh_cn = train_args['thresh_cn']
@@ -49,11 +44,7 @@ class LinkTransformer(nn.Module):
             self.mask = "1-hop"
         else:
             self.mask = "all"
-
-        # Based on PPR scores
-        self.filter_cn = train_args['filter_cn']
-        self.filter_1hop = train_args['filter_1hop']
-
+            
         self.dim = train_args['dim']
         self.att_drop = train_args.get('att_drop', 0)
         self.num_layers = train_args['trans_layers']
@@ -77,27 +68,17 @@ class LinkTransformer(nn.Module):
         # Structural info
         self.ppr_encoder_cn = MLP(2, 2, self.dim, self.dim)
         if self.mask == "cn":
-            count_dim = 1 if not train_args['ablate_counts'] else 0
+            count_dim = 1
         elif self.mask == "1-hop":
             self.ppr_encoder_onehop = MLP(2, 2, self.dim, self.dim)
-            count_dim = 3 if not train_args['ablate_counts'] else 0
+            count_dim = 3
         else:
-            count_dim = 4 if not train_args['ablate_counts'] else 0
+            count_dim = 4
             self.ppr_encoder_onehop = MLP(2, 2, self.dim, self.dim)
             self.ppr_encoder_non1hop = MLP(2, 2, self.dim, self.dim)
         
-        if train_args['ablate_ppr_type']:
-            self.ppr_encoder_cn = self.ppr_encoder_onehop = self.ppr_encoder_non1hop = self.ppr_encoder_non1hop = MLP(2, 2, self.dim, self.dim)
-        
         pairwise_dim = self.dim * train_args['num_heads'] + count_dim
         self.pairwise_lin = MLP(2, pairwise_dim, pairwise_dim, self.dim)  
-
-        # Use embs instead for PE for ablation study
-        if train_args['ablate_ppr']:
-            self.cn_emb = nn.Parameter(torch.empty((self.dim)))
-            self.onehop_emb = nn.Parameter(torch.empty((self.dim)))
-            uniform_(self.cn_emb)
-            uniform_(self.onehop_emb)
 
 
     def forward(self, batch, adj_prop=None, adj_mask=None, test_set=False, return_weights=False):
@@ -173,9 +154,8 @@ class LinkTransformer(nn.Module):
             for l in range(self.num_layers):
                 pairwise_feats, att_weights = self.att_layers[l](node_mask, pairwise_feats, X_node, pes, return_weights=return_weights)
             
-            if not self.train_args['ablate_counts']:
-                num_cns = self.get_count(node_mask, batch, test_set)
-                pairwise_feats = torch.cat((pairwise_feats, num_cns), dim=-1)
+            num_cns = self.get_count(node_mask, batch, test_set)
+            pairwise_feats = torch.cat((pairwise_feats, num_cns), dim=-1)
 
         else:
             cn_info, onehop_info, non1hop_info = self.compute_node_mask(batch, test_set, adj_mask)
@@ -187,22 +167,15 @@ class LinkTransformer(nn.Module):
                 all_mask = torch.cat((cn_info[0], onehop_info[0]), dim=-1)
                 pes = self.get_pos_encodings(cn_info, onehop_info)
 
-            # NOTE: Random Mask!
-            # all_info = self.compute_node_mask_random(batch, test_set, adj_mask)
-            # pes = self.get_pos_encodings(all_info)
-            # all_mask = all_info[0]
-            # NUM_NODES_CHOSEN['all'].append(all_mask.shape[1] / batch.size(1))
-
             for l in range(self.num_layers):
                 pairwise_feats, att_weights = self.att_layers[l](all_mask, pairwise_feats, X_node, pes, None, return_weights)
             
-            if not self.train_args['ablate_counts']:
-                num_cns, num_1hop, num_non1hop, num_neighbors = self.get_structure_cnts(batch, cn_info, onehop_info, non1hop_info, test_set=test_set) 
+            num_cns, num_1hop, num_non1hop, num_neighbors = self.get_structure_cnts(batch, cn_info, onehop_info, non1hop_info, test_set=test_set) 
 
-                if num_non1hop is not None:
-                    pairwise_feats = torch.cat((pairwise_feats, num_cns, num_1hop, num_non1hop, num_neighbors), dim=-1)
-                else:
-                    pairwise_feats = torch.cat((pairwise_feats, num_cns, num_1hop, num_neighbors), dim=-1)
+            if num_non1hop is not None:
+                pairwise_feats = torch.cat((pairwise_feats, num_cns, num_1hop, num_non1hop, num_neighbors), dim=-1)
+            else:
+                pairwise_feats = torch.cat((pairwise_feats, num_cns, num_1hop, num_neighbors), dim=-1)
 
         pairwise_feats = self.pairwise_lin(pairwise_feats)
         return pairwise_feats, att_weights
@@ -218,24 +191,18 @@ class LinkTransformer(nn.Module):
         torch.Tensor
             Concatenated encodings for cn and 1-hop
         """
-        if not self.train_args['ablate_ppr']:
-            cn_a = self.ppr_encoder_cn(torch.stack((cn_info[1], cn_info[2])).t())
-            cn_b = self.ppr_encoder_cn(torch.stack((cn_info[2], cn_info[1])).t())
-            cn_pe = cn_a + cn_b
-        else:
-            # Ablation study on PE - No PPR info
-            cn_pe = self.cn_emb.repeat(cn_info[0].size(1), 1) 
+        cn_a = self.ppr_encoder_cn(torch.stack((cn_info[1], cn_info[2])).t())
+        cn_b = self.ppr_encoder_cn(torch.stack((cn_info[2], cn_info[1])).t())
+        cn_pe = cn_a + cn_b
+
 
         if onehop_info is None:
             return cn_pe
 
-        if not self.train_args['ablate_ppr']:
-            onehop_a = self.ppr_encoder_onehop(torch.stack((onehop_info[1] , onehop_info[2])).t())
-            onehop_b = self.ppr_encoder_onehop(torch.stack((onehop_info[2], onehop_info[1])).t())
-            onehop_pe = onehop_a + onehop_b
-        else:
-            # Ablation study on PE - No PPR info
-            onehop_pe = self.onehop_emb.repeat(onehop_info[0].size(1), 1)
+        onehop_a = self.ppr_encoder_onehop(torch.stack((onehop_info[1] , onehop_info[2])).t())
+        onehop_b = self.ppr_encoder_onehop(torch.stack((onehop_info[2], onehop_info[1])).t())
+        onehop_pe = onehop_a + onehop_b
+
 
         if non1hop_info is None:
             return torch.cat((cn_pe, onehop_pe), dim=0)
@@ -274,20 +241,16 @@ class LinkTransformer(nn.Module):
             
         pair_ix, node_type, src_ppr, tgt_ppr = self.get_ppr_vals(batch, pair_adj, test_set)
 
-        if self.filter_1hop or self.filter_cn:
-            thresh_cn = self.thresh_cn if self.filter_cn else 0 
-            thresh_1hop = self.thresh_1hop if self.filter_1hop and self.mask != "cn" else 0 
+        cn_filt_cond = (src_ppr >= self.thresh_cn) & (tgt_ppr >= self.thresh_cn)
+        onehop_filt_cond = (src_ppr >= self.thresh_1hop) & (tgt_ppr >= self.thresh_1hop)
+    
+        if self.mask != "cn":
+            filt_cond = torch.where(node_type == 1, onehop_filt_cond, cn_filt_cond)
+        else:
+            filt_cond = torch.where(node_type == 0, onehop_filt_cond, cn_filt_cond)
 
-            cn_filt_cond = (src_ppr >= thresh_cn) & (tgt_ppr >= thresh_cn)
-            onehop_filt_cond = (src_ppr >= thresh_1hop) & (tgt_ppr >= thresh_1hop)
-        
-            if self.mask != "cn":
-                filt_cond = torch.where(node_type == 1, onehop_filt_cond, cn_filt_cond)
-            else:
-                filt_cond = torch.where(node_type == 0, onehop_filt_cond, cn_filt_cond)
-
-            pair_ix, node_type = pair_ix[:, filt_cond], node_type[filt_cond]
-            src_ppr, tgt_ppr = src_ppr[filt_cond], tgt_ppr[filt_cond]
+        pair_ix, node_type = pair_ix[:, filt_cond], node_type[filt_cond]
+        src_ppr, tgt_ppr = src_ppr[filt_cond], tgt_ppr[filt_cond]
 
         # >1-Hop mask is gotten separately
         if self.mask == "all":
@@ -375,7 +338,7 @@ class LinkTransformer(nn.Module):
         """
         num_cns = self.get_count(cn_info[0], batch, test_set)            
         num_1hop = self.get_num_ppr_thresh(batch, onehop_info[0], onehop_info[1], 
-                                           onehop_info[2], test_set=test_set, ra=self.count_ra)
+                                           onehop_info[2], test_set=test_set)
 
         num_ppr_ones = self.get_num_ppr_thresh(batch, onehop_info[0], onehop_info[1], 
                                                onehop_info[2], thresh=0, test_set=test_set)
@@ -388,7 +351,7 @@ class LinkTransformer(nn.Module):
             return num_cns, num_1hop, num_non1hop, num_neighbors
 
 
-    def get_num_ppr_thresh(self, batch, onehop_mask, src_ppr, tgt_ppr, test_set=False, thresh=None, ra=False):
+    def get_num_ppr_thresh(self, batch, onehop_mask, src_ppr, tgt_ppr, test_set=False, thresh=None):
         """
         Get # of nodes where ppr(a, v) >= thresh & ppr(b, v) >= thresh
 
@@ -397,11 +360,7 @@ class LinkTransformer(nn.Module):
         if thresh is None:
             thresh = self.thresh_1hop
 
-        if ra:
-            node_deg = self.get_degree(test_set)
-            weight = 1 / torch.index_select(node_deg, 0, onehop_mask[1]) #.unsqueeze(-1)
-        else:
-            weight = torch.ones(onehop_mask.size(1), device=onehop_mask.device)
+        weight = torch.ones(onehop_mask.size(1), device=onehop_mask.device)
 
         ppr_above_thresh = (src_ppr >= thresh) & (tgt_ppr >= thresh)
         num_ppr = scatter(ppr_above_thresh.float() * weight, onehop_mask[0].long(), dim=0, dim_size=batch.size(1), reduce="sum")
@@ -414,11 +373,7 @@ class LinkTransformer(nn.Module):
         """
         # of CNs for each sample in batch 
         """
-        if self.count_ra:
-            node_deg = self.get_degree(test_set)
-            weight = 1 / (torch.index_select(node_deg, 0, node_mask[1]) + 1e-1)
-        else:
-            weight = torch.ones(node_mask.size(1), device=node_mask.device)
+        weight = torch.ones(node_mask.size(1), device=node_mask.device)
 
         num_cns = scatter(weight, node_mask[0].long(), dim=0, dim_size=batch.size(1), reduce="sum")
         num_cns = num_cns.unsqueeze(-1)
@@ -520,56 +475,3 @@ class LinkTransformer(nn.Module):
 
         return src_ix, src_vals, tgt_vals
 
-
-    ###################################################################################################
-    ###################################################################################################
-    ###################################################################################################
-
-
-    def compute_node_mask_random(self, batch, test_set, adj):
-        """
-        Select random nodes instead of via PPR
-        """
-        ### Select k random nodes for each sample in batch
-        k = 29
-        # node_mask = torch.zeros((batch.size(1), self.num_nodes))
-        # node_mask[:, :k] = 1
-        # node_mask = node_mask[:,torch.randperm(node_mask.size()[1])]
-
-        """
-        1. {
-            For b in batch_size:
-                Draw k entities in [0, num_entities-1]
-        }
-        2. Use to create "edge_index" 
-        3. convert edge_index to coo
-        4. Rest is the same
-        """
-        rand_nodes = np.random.choice(self.num_nodes, size=k*batch.size(1))
-        rand_nodes = torch.from_numpy(rand_nodes)
-        rand_nodes = rand_nodes.to(self.device)
-
-        batch_ix = [torch.ones(k) * l for l in range(batch.size(1))]
-        batch_ix = torch.cat(batch_ix).to(self.device)
-
-        node_mask = torch.stack((batch_ix, rand_nodes))
-
-        node_mask_sparse = torch.sparse_coo_tensor(node_mask, torch.ones(node_mask.size(1), device=self.device), 
-                                                   size=(batch.size(1), self.num_nodes)).to(self.device)
-
-        # node_mask_sparse = node_mask.to_sparse()
-
-        ppr = self.get_ppr(test_set)
-        src_ppr = torch.index_select(ppr, 0, batch[0])
-        tgt_ppr = torch.index_select(ppr, 0, batch[1])
-
-
-        src_ppr = (src_ppr + node_mask_sparse) * node_mask_sparse
-        tgt_ppr = (tgt_ppr + node_mask_sparse) * node_mask_sparse
-
-        src_ix = src_ppr.coalesce().indices()
-        src_vals = src_ppr.coalesce().values() - 1
-        tgt_vals = tgt_ppr.coalesce().values() - 1
-
-        return src_ix, src_vals, tgt_vals
-    

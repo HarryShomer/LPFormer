@@ -30,7 +30,7 @@ def train_epoch(model, score_func, data, optimizer, args, device):
 
     total_loss = total_examples = 0
     d = DataLoader(range(train_pos.size(0)), args.batch_size, shuffle=True)
-    d = tqdm(d, "Epoch") #if args.verbose else d
+    d = tqdm(d, "Epoch")
     
     for perm in d:
         edges = train_pos[perm].t()

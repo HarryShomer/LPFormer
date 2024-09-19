@@ -81,10 +81,10 @@ def read_data_ogb(args, device):
         data.edge_weight = data.edge_weight.view(-1).to(torch.float)
     else:
         edge_weight = torch.ones(edge_index.size(1)).to(device).float()
-        
+    
     data_obj['adj_t'] = SparseTensor.from_edge_index(edge_index, edge_weight.squeeze(-1), [data.num_nodes, data.num_nodes]).to(device)
 
-    # TODO: Needed since directed graph
+    # Needed since directed graph
     if args.data_name == 'ogbl-citation2': 
         data_obj['adj_t'] = data_obj['adj_t'].to_symmetric().coalesce()
         data_obj['adj_mask'] = data_obj['adj_t'].to_symmetric().to_torch_sparse_coo_tensor()

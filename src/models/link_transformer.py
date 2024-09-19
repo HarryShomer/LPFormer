@@ -238,7 +238,7 @@ class LinkTransformer(nn.Module):
         else:
             # Equals: {0: ">1-Hop", 1: "1-Hop (Non-CN)", 2: "CN"}
             pair_adj = src_adj + tgt_adj  
-            
+        
         pair_ix, node_type, src_ppr, tgt_ppr = self.get_ppr_vals(batch, pair_adj, test_set)
 
         cn_filt_cond = (src_ppr >= self.thresh_cn) & (tgt_ppr >= self.thresh_cn)
@@ -298,14 +298,22 @@ class LinkTransformer(nn.Module):
         src_ppr = src_ppr_adj.coalesce().values()
         tgt_ppr = tgt_ppr_adj.coalesce().values()
 
-        pair_diff_adj = pair_diff_adj.coalesce().values()
-        pair_diff_adj = pair_diff_adj[src_ppr != 0]
-        
         # If one is 0 so is the other
         # NOTE: Should be few to no nodes here
-        src_ppr = src_ppr[src_ppr != 0]
+        # src_ppr = src_ppr[src_ppr != 0]
+        # tgt_ppr = tgt_ppr[tgt_ppr != 0]
+        # ppr_ix = ppr_ix[:, src_ppr != 0]
+        
+        # TODO: Needed due to a bug in recent torch versions 
+        # see here for more - https://github.com/pytorch/pytorch/issues/114529
+        # note that if one is 0 so is the other
+        zero_vals = (src_ppr != 0) 
+        src_ppr = src_ppr[zero_vals]
         tgt_ppr = tgt_ppr[tgt_ppr != 0]
-        ppr_ix = ppr_ix[:, src_ppr != 0]
+        ppr_ix = ppr_ix[:, zero_vals]
+
+        pair_diff_adj = pair_diff_adj.coalesce().values()
+        pair_diff_adj = pair_diff_adj[src_ppr != 0]
 
         # Remove additional +1 from each ppr val
         src_ppr = (src_ppr - pair_diff_adj) / pair_diff_adj

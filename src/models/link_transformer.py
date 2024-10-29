@@ -228,7 +228,7 @@ class LinkTransformer(nn.Module):
         """
         if adj is None:
             adj = self.get_adj(test_set, mask=True)
-
+        
         src_adj = torch.index_select(adj, 0, batch[0])
         tgt_adj = torch.index_select(adj, 0, batch[1])
 

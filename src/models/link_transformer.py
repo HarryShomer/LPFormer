@@ -145,7 +145,6 @@ class LinkTransformer(nn.Module):
         k_i, k_j = X_node[batch[0]], X_node[batch[1]]
         pairwise_feats = torch.cat((k_i, k_j), dim=-1)
 
-
         if self.mask == "cn":
             cn_info, _, _ = self.compute_node_mask(batch, test_set, adj_mask)
             node_mask = cn_info[0]
@@ -243,7 +242,7 @@ class LinkTransformer(nn.Module):
 
         cn_filt_cond = (src_ppr >= self.thresh_cn) & (tgt_ppr >= self.thresh_cn)
         onehop_filt_cond = (src_ppr >= self.thresh_1hop) & (tgt_ppr >= self.thresh_1hop)
-    
+
         if self.mask != "cn":
             filt_cond = torch.where(node_type == 1, onehop_filt_cond, cn_filt_cond)
         else:
@@ -438,7 +437,7 @@ class LinkTransformer(nn.Module):
         """
         Get PPR scores for non-1hop nodes.
 
-        NOTE: Use original adj_mask (in train_model.train_epoch we remove the batch links)
+        NOTE: Use original adj_mask (in train_model.train_epoch() we remove the batch links)
         Done since removing them converts src/tgt to >1-hop nodes
         Therefore removing CN and 1-hop will also remove the batch links
         Don't bother in testing since we are only given the train graph

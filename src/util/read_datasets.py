@@ -99,7 +99,7 @@ def read_data_ogb(args, device):
         val_edge_index = to_undirected(val_edge_index).to(device)
 
         full_edge_index = torch.cat([edge_index, val_edge_index], dim=-1)
-        data['full_edge_index'] = full_edge_index.to(device)
+        data['full_edge_index'] = data_obj['full_edge_index'] = full_edge_index.to(device)
 
         val_edge_weight = torch.ones([val_edge_index.size(1), 1], dtype=torch.float, device=device)
         val_edge_weight = torch.cat([edge_weight, val_edge_weight], 0).view(-1)
@@ -111,6 +111,7 @@ def read_data_ogb(args, device):
     else:
         data_obj['full_adj_t'] = data_obj['adj_t']
         data_obj['full_adj_mask'] = data_obj['adj_mask']
+        data_obj['full_edge_index'] = edge_index
 
     data_obj['degree'] = degree(edge_index[0], num_nodes=data_obj['num_nodes']).to(device)
     if args.use_val_in_test:
@@ -122,8 +123,8 @@ def read_data_ogb(args, device):
                               0.15, args.eps, False).to(device)  
 
     if args.use_val_in_test:
-        data_obj['ppr'] = get_ppr(args.data_name, data['full_edge_index'], data['num_nodes'],
-                                0.15, args.eps, True).to(device)  
+        data_obj['ppr_test'] = get_ppr(args.data_name, data['full_edge_index'], data['num_nodes'],
+                                       0.15, args.eps, True).to(device)  
     else:
         data_obj['ppr_test'] = data_obj['ppr']
 
@@ -225,7 +226,8 @@ def read_data_planetoid(args, device):
     data['test_neg'] = test_neg.to(device)
 
     data['x'] = feature_embeddings.to(device)
-
+    
+    data['full_edge_index'] = edge_index
     data['adj_t'] = SparseTensor.from_edge_index(edge_index, edge_weight, [num_nodes, num_nodes]).to(device)
     data['full_adj_t'] = data['adj_t'].to(device)
 

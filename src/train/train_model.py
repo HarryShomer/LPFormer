@@ -59,10 +59,10 @@ def train_epoch(model, score_func, data, optimizer, args, device):
         h = model(edges, adj_prop=masked_adjt, adj_mask=masked_adj)
         pos_out = score_func(h)
         pos_loss = -torch.log(pos_out + 1e-6).mean()
-
+        
         # Just do some trivial random sampling for negative samples
         neg_edges = torch.randint(0, data['num_nodes'], (edges.size(0), edges.size(1) * args.num_negative), dtype=torch.long, device=h.device)
-        
+
         h = model(neg_edges)
         neg_out = score_func(h)
         neg_loss = -torch.log(1 - neg_out + 1e-6).mean()

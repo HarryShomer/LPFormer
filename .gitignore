@@ -4,6 +4,8 @@ tune_ogb.py
 att_scores/
 factors/
 analysis/
+calc_heuristics.py 
+corr_analysis.py
 
 *.pt
 /.idea

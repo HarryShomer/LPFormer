@@ -7,7 +7,7 @@ from ogb.linkproppred import PygLinkPropPredDataset, Evaluator
 
 from util.utils import *
 from util.read_datasets import read_data_ogb, read_data_planetoid
-from train.train_model import train_data, test, compute_all_ppr, test_by_all, test_with_att, test_by_factor
+from train.train_model import train_data, test
 
 from models.other_models import mlp_score
 from models.link_transformer import LinkTransformer

@@ -5,14 +5,12 @@ from torch_scatter import scatter
 from torch.nn.init import uniform_
 import numpy as np 
 
-
 from models.other_models import *
 from modules.node_encoder import NodeEncoder
 from modules.layers import LinkTransformerLayer
 
 import warnings
 warnings.filterwarnings("ignore")
-
 
 
 class LinkTransformer(nn.Module):

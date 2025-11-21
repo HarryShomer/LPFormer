@@ -1,6 +1,7 @@
 # LPFormer
 
-<span style="color:red">Now available as part of PyTorch Geometric (PyG)! Check it out [here](https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.nn.models.LPFormer.html#torch_geometric.nn.models.LPFormer).</span>
+📣 **Now available as part of PyTorch Geometric (PyG)!** Check it out [here](https://pytorch-geometric.readthedocs.io/en/latest/generated/torch_geometric.nn.models.LPFormer.html#torch_geometric.nn.models.LPFormer).
+
 
 Official Implementation of the KDD'24 paper - "LPFormer: An Adaptive Graph Transformer for Link Prediction"
 
